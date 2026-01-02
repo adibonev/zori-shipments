@@ -1,0 +1,22 @@
+{
+  "name": "zori-shipments",
+  "version": "1.0.0",
+  "description": "Управление на магазинни пратки - отслеждане на разходи и печалби",
+  "main": "index.html",
+  "scripts": {
+    "start": "open index.html"
+  },
+  "keywords": [
+    "shipment",
+    "management",
+    "profit",
+    "tracking",
+    "e-commerce"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/zori-shipments.git"
+  }
+}
