@@ -4,13 +4,13 @@ class ShipmentManager {
   constructor() {
     this.loadData();
     this.productIndex = 1;
+    this.editingShipmentId = null;
   }
 
   loadData() {
     try {
       const shipmentsData = localStorage.getItem('shipments');
       this.shipments = shipmentsData ? JSON.parse(shipmentsData) : [];
-      if (!Array.isArray(this.shipments)) this.shipments = [];
     } catch (e) {
       this.shipments = [];
     }
@@ -24,27 +24,32 @@ class ShipmentManager {
   setupEventListeners() {
     const addBtn = document.getElementById('addShipmentBtn');
     const addProductBtn = document.getElementById('addProductBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
     const dateInput = document.getElementById('shipmentDate');
 
-    if (addBtn) {
-      addBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.addShipment();
-      });
-    }
+    if (addBtn) addBtn.addEventListener('click', (e) => { e.preventDefault(); this.addShipment(); });
+    if (addProductBtn) addProductBtn.addEventListener('click', (e) => { e.preventDefault(); this.addProductField(); });
+    if (cancelEditBtn) cancelEditBtn.addEventListener('click', () => this.cancelEdit());
+    if (dateInput) dateInput.valueAsDate = new Date();
 
-    if (addProductBtn) {
-      addProductBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.addProductField();
-      });
-    }
-
-    if (dateInput) {
-      dateInput.valueAsDate = new Date();
-    }
+    // Слушай промяни на разходи за конвертиране
+    ['transportCost', 'vatCost', 'adsCost', 'processingFee'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input) input.addEventListener('input', () => this.updateExpenses());
+    });
 
     this.attachProductListeners();
+  }
+
+  updateExpenses() {
+    const transport = (parseFloat(document.getElementById('transportCost').value) || 0) * EXCHANGE_RATE;
+    const vat = (parseFloat(document.getElementById('vatCost').value) || 0) * EXCHANGE_RATE;
+    const ads = (parseFloat(document.getElementById('adsCost').value) || 0) * EXCHANGE_RATE;
+    const processing = (parseFloat(document.getElementById('processingFee').value) || 0) * EXCHANGE_RATE;
+
+    const totalExpenses = transport + vat + ads + processing;
+    const totalExpensesEl = document.getElementById('totalExpenses');
+    if (totalExpensesEl) totalExpensesEl.value = totalExpenses.toFixed(2);
   }
 
   attachProductListeners() {
@@ -69,10 +74,7 @@ class ShipmentManager {
     });
 
     document.querySelectorAll('.btn-remove-product').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.removeProductField(e.target.dataset.index);
-      });
+      btn.addEventListener('click', (e) => { e.preventDefault(); this.removeProductField(e.target.dataset.index); });
     });
   }
 
@@ -98,68 +100,18 @@ class ShipmentManager {
 
   addProductField() {
     const container = document.getElementById('productsContainer');
-    const newIndex = this.productIndex;
-    this.productIndex++;
+    const newIndex = this.productIndex++;
 
     const productItem = document.createElement('div');
     productItem.className = 'product-item';
     productItem.id = `product_${newIndex}`;
     productItem.innerHTML = `
       <h4>Продукт ${newIndex + 1}</h4>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Описание:</label>
-          <input type="text" class="productName" data-index="${newIndex}" placeholder="Описание на продукта" required>
-        </div>
-        <div class="form-group">
-          <label>Размер:</label>
-          <select class="productSize" data-index="${newIndex}" required>
-            <option value="">Избери размер</option>
-            <option value="XS">XS</option>
-            <option value="S">S</option>
-            <option value="M">M</option>
-            <option value="L">L</option>
-            <option value="XL">XL</option>
-            <option value="XXL">XXL</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Валута:</label>
-          <select class="currency" data-index="${newIndex}" required>
-            <option value="EUR">€ Евро</option>
-            <option value="USD">$ Долар</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Цена на продукта:</label>
-          <input type="number" class="productCost" data-index="${newIndex}" step="0.01" min="0" required>
-        </div>
-        <div class="form-group">
-          <label>В евро:</label>
-          <input type="number" class="convertedCost" data-index="${newIndex}" step="0.01" min="0" readonly>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group checkbox-group">
-          <label>
-            <input type="checkbox" class="isSold" data-index="${newIndex}" checked>
-            Продаден ли е продуктът?
-          </label>
-        </div>
-      </div>
-      <div class="form-row sold-section" data-index="${newIndex}">
-        <div class="form-group">
-          <label>Цена продажба (€):</label>
-          <input type="number" class="productSellPrice" data-index="${newIndex}" step="0.01" min="0" required>
-        </div>
-        <div class="form-group">
-          <label>Печалба/Загуба (€):</label>
-          <input type="number" class="productProfit" data-index="${newIndex}" step="0.01" readonly style="background: #f0f0f0;">
-        </div>
-      </div>
-      <button type="button" class="btn-remove-product" data-index="${newIndex}">Премахни продукт</button>
+      <div class="form-row"><div class="form-group"><label>Описание:</label><input type="text" class="productName" data-index="${newIndex}" placeholder="Описание" required></div><div class="form-group"><label>Размер:</label><select class="productSize" data-index="${newIndex}" required><option value="">Избери</option><option value="XS">XS</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Валута:</label><select class="currency" data-index="${newIndex}" required><option value="EUR">€ Евро</option><option value="USD">$ Долар</option></select></div><div class="form-group"><label>Цена:</label><input type="number" class="productCost" data-index="${newIndex}" step="0.01" min="0" required></div><div class="form-group"><label>В евро:</label><input type="number" class="convertedCost" data-index="${newIndex}" step="0.01" readonly></div></div>
+      <div class="form-row"><div class="form-group checkbox-group"><label><input type="checkbox" class="isSold" data-index="${newIndex}" checked> Продаден?</label></div></div>
+      <div class="form-row sold-section" data-index="${newIndex}"><div class="form-group"><label>Продажба (€):</label><input type="number" class="productSellPrice" data-index="${newIndex}" step="0.01" min="0" required></div><div class="form-group"><label>Печалба:</label><input type="number" class="productProfit" data-index="${newIndex}" readonly style="background:#f0f0f0;"></div></div>
+      <button type="button" class="btn-remove-product" data-index="${newIndex}">Премахни</button>
     `;
 
     container.appendChild(productItem);
@@ -169,14 +121,10 @@ class ShipmentManager {
 
   removeProductField(index) {
     const productItem = document.getElementById(`product_${index}`);
-    if (productItem) {
-      productItem.remove();
-      this.updateTotals();
-    }
+    if (productItem) productItem.remove();
     const items = document.querySelectorAll('.product-item');
-    if (items.length === 1) {
-      document.querySelectorAll('.btn-remove-product').forEach(btn => btn.style.display = 'none');
-    }
+    if (items.length === 1) document.querySelectorAll('.btn-remove-product').forEach(btn => btn.style.display = 'none');
+    this.updateTotals();
   }
 
   updateProductConversion(costInput) {
@@ -188,10 +136,7 @@ class ShipmentManager {
     const convertedInput = document.querySelector(`.convertedCost[data-index="${index}"]`);
 
     let convertedPrice = productCost;
-    if (currency === 'USD') {
-      convertedPrice = productCost * EXCHANGE_RATE;
-    }
-
+    if (currency === 'USD') convertedPrice = productCost * EXCHANGE_RATE;
     if (convertedInput) convertedInput.value = convertedPrice.toFixed(2);
 
     const sellPriceInput = document.querySelector(`.productSellPrice[data-index="${index}"]`);
@@ -206,36 +151,36 @@ class ShipmentManager {
     const convertedCost = convertedCostInput ? parseFloat(convertedCostInput.value) || 0 : 0;
     const sellPrice = parseFloat(sellPriceInput.value) || 0;
     const profitInput = document.querySelector(`.productProfit[data-index="${index}"]`);
-
     if (profitInput) profitInput.value = (sellPrice - convertedCost).toFixed(2);
     this.updateTotals();
   }
 
   updateTotals() {
-    let totalProductCost = 0;
-    let totalSellPrice = 0;
-
+    let totalProductCost = 0, totalSellPrice = 0;
     document.querySelectorAll('.product-item').forEach(item => {
       const isSoldCheckbox = item.querySelector('.isSold');
       const isSold = isSoldCheckbox ? isSoldCheckbox.checked : true;
       const costInput = item.querySelector('.convertedCost');
       const sellPriceInput = item.querySelector('.productSellPrice');
-
       totalProductCost += costInput ? parseFloat(costInput.value) || 0 : 0;
       if (isSold) totalSellPrice += sellPriceInput ? parseFloat(sellPriceInput.value) || 0 : 0;
     });
-
     const totalProductInput = document.getElementById('totalProductCost');
     const totalSellInput = document.getElementById('totalSellPrice');
     if (totalProductInput) totalProductInput.value = totalProductCost.toFixed(2);
     if (totalSellInput) totalSellInput.value = totalSellPrice.toFixed(2);
+    this.updateExpenses();
   }
 
   addShipment() {
     const date = document.getElementById('shipmentDate').value;
-    const transportCost = parseFloat(document.getElementById('transportCost').value) || 0;
-    const products = [];
+    const transport = (parseFloat(document.getElementById('transportCost').value) || 0) * EXCHANGE_RATE;
+    const vat = (parseFloat(document.getElementById('vatCost').value) || 0) * EXCHANGE_RATE;
+    const ads = (parseFloat(document.getElementById('adsCost').value) || 0) * EXCHANGE_RATE;
+    const processing = (parseFloat(document.getElementById('processingFee').value) || 0) * EXCHANGE_RATE;
+    const totalExpenses = transport + vat + ads + processing;
 
+    const products = [];
     document.querySelectorAll('.product-item').forEach((item) => {
       const name = item.querySelector('.productName')?.value.trim() || '';
       const size = item.querySelector('.productSize')?.value || '';
@@ -244,12 +189,7 @@ class ShipmentManager {
       const sellPrice = parseFloat(item.querySelector('.productSellPrice')?.value) || 0;
 
       if (name && size && cost > 0) {
-        products.push({
-          id: Date.now() + Math.random(),
-          name, size, cost, isSold,
-          sellPrice: isSold ? sellPrice : 0,
-          profit: isSold ? sellPrice - cost : 0
-        });
+        products.push({ id: Date.now() + Math.random(), name, size, cost, isSold, sellPrice: isSold ? sellPrice : 0, profit: isSold ? sellPrice - cost : 0 });
       }
     });
 
@@ -259,36 +199,28 @@ class ShipmentManager {
     const totalProductCost = products.reduce((sum, p) => sum + p.cost, 0);
     const totalSellPrice = products.filter(p => p.isSold).reduce((sum, p) => sum + p.sellPrice, 0);
 
-    this.shipments.push({
-      id: Date.now(),
-      date, products, transportCost, totalProductCost, totalSellPrice,
-      totalCost: totalProductCost + transportCost,
-      profit: totalSellPrice - (totalProductCost + transportCost)
-    });
+    const shipment = {
+      id: this.editingShipmentId || Date.now(),
+      date, products, transport, vat, ads, processing, totalExpenses,
+      totalProductCost, totalSellPrice,
+      totalCost: totalProductCost + totalExpenses,
+      profit: totalSellPrice - (totalProductCost + totalExpenses)
+    };
+
+    if (this.editingShipmentId) {
+      const idx = this.shipments.findIndex(s => s.id === this.editingShipmentId);
+      if (idx !== -1) this.shipments[idx] = shipment;
+      this.editingShipmentId = null;
+      this.cancelEdit();
+      alert('✅ Пратка редактирана!');
+    } else {
+      this.shipments.push(shipment);
+      alert('✅ Пратка добавена!');
+    }
 
     this.save();
     this.clearForm();
     this.render();
-    alert('✅ Пратка добавена!');
-  }
-
-  markProductAsSold(shipmentId, productId, sellPrice) {
-    if (!sellPrice || sellPrice <= 0) { alert('Въведете валидна цена!'); return; }
-
-    const shipment = this.shipments.find(s => s.id === shipmentId);
-    const product = shipment?.products.find(p => p.id === productId);
-    if (!product) { alert('Продуктът не е намерен!'); return; }
-
-    product.isSold = true;
-    product.sellPrice = sellPrice;
-    product.profit = sellPrice - product.cost;
-
-    shipment.totalSellPrice = shipment.products.filter(p => p.isSold).reduce((sum, p) => sum + p.sellPrice, 0);
-    shipment.profit = shipment.totalSellPrice - shipment.totalCost;
-
-    this.save();
-    this.render();
-    alert('✅ Продуктът е продаден!');
   }
 
   deleteShipment(id) {
@@ -297,6 +229,51 @@ class ShipmentManager {
       this.save();
       this.render();
     }
+  }
+
+  editShipment(id) {
+    const shipment = this.shipments.find(s => s.id === id);
+    if (!shipment) return;
+
+    this.editingShipmentId = id;
+    document.getElementById('shipmentDate').value = shipment.date;
+    document.getElementById('transportCost').value = (shipment.transport / EXCHANGE_RATE).toFixed(2);
+    document.getElementById('vatCost').value = (shipment.vat / EXCHANGE_RATE).toFixed(2);
+    document.getElementById('adsCost').value = (shipment.ads / EXCHANGE_RATE).toFixed(2);
+    document.getElementById('processingFee').value = (shipment.processing / EXCHANGE_RATE).toFixed(2);
+
+    const container = document.getElementById('productsContainer');
+    container.innerHTML = '';
+    this.productIndex = 0;
+
+    shipment.products.forEach((p) => {
+      const newIndex = this.productIndex++;
+      const productItem = document.createElement('div');
+      productItem.className = 'product-item';
+      productItem.id = `product_${newIndex}`;
+      productItem.innerHTML = `
+        <h4>Продукт ${newIndex + 1}</h4>
+        <div class="form-row"><div class="form-group"><label>Описание:</label><input type="text" class="productName" data-index="${newIndex}" value="${p.name}" placeholder="Описание" required></div><div class="form-group"><label>Размер:</label><select class="productSize" data-index="${newIndex}" required><option value="">Избери</option><option value="XS" ${p.size === 'XS' ? 'selected' : ''}>XS</option><option value="S" ${p.size === 'S' ? 'selected' : ''}>S</option><option value="M" ${p.size === 'M' ? 'selected' : ''}>M</option><option value="L" ${p.size === 'L' ? 'selected' : ''}>L</option><option value="XL" ${p.size === 'XL' ? 'selected' : ''}>XL</option><option value="XXL" ${p.size === 'XXL' ? 'selected' : ''}>XXL</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label>Валута:</label><select class="currency" data-index="${newIndex}" required><option value="EUR">€ Евро</option><option value="USD">$ Долар</option></select></div><div class="form-group"><label>Цена:</label><input type="number" class="productCost" data-index="${newIndex}" value="${p.cost}" step="0.01" min="0" required></div><div class="form-group"><label>В евро:</label><input type="number" class="convertedCost" data-index="${newIndex}" value="${p.cost}" step="0.01" readonly></div></div>
+        <div class="form-row"><div class="form-group checkbox-group"><label><input type="checkbox" class="isSold" data-index="${newIndex}" ${p.isSold ? 'checked' : ''}> Продаден?</label></div></div>
+        <div class="form-row sold-section" data-index="${newIndex}" ${p.isSold ? '' : 'style="display:none;"'}><div class="form-group"><label>Продажба (€):</label><input type="number" class="productSellPrice" data-index="${newIndex}" value="${p.sellPrice}" step="0.01" min="0" ${p.isSold ? 'required' : ''}></div><div class="form-group"><label>Печалба:</label><input type="number" class="productProfit" data-index="${newIndex}" value="${p.profit}" readonly style="background:#f0f0f0;"></div></div>
+        <button type="button" class="btn-remove-product" data-index="${newIndex}">Премахни</button>
+      `;
+      container.appendChild(productItem);
+    });
+
+    document.getElementById('addShipmentBtn').textContent = '💾 Запази редакции';
+    document.getElementById('cancelEditBtn').style.display = 'inline-block';
+    document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+    this.attachProductListeners();
+    this.updateTotals();
+  }
+
+  cancelEdit() {
+    this.editingShipmentId = null;
+    document.getElementById('addShipmentBtn').textContent = 'Добавяне на пратка';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    this.clearForm();
   }
 
   deleteProduct(shipmentId, productId) {
@@ -318,6 +295,21 @@ class ShipmentManager {
     }
   }
 
+  markProductAsSold(shipmentId, productId, sellPrice) {
+    if (!sellPrice || sellPrice <= 0) { alert('Въведете валидна цена!'); return; }
+    const shipment = this.shipments.find(s => s.id === shipmentId);
+    const product = shipment?.products.find(p => p.id === productId);
+    if (!product) { alert('Продуктът не е намерен!'); return; }
+    product.isSold = true;
+    product.sellPrice = sellPrice;
+    product.profit = sellPrice - product.cost;
+    shipment.totalSellPrice = shipment.products.filter(p => p.isSold).reduce((sum, p) => sum + p.sellPrice, 0);
+    shipment.profit = shipment.totalSellPrice - shipment.totalCost;
+    this.save();
+    this.render();
+    alert('✅ Продуктът е продаден!');
+  }
+
   save() {
     localStorage.setItem('shipments', JSON.stringify(this.shipments));
   }
@@ -327,15 +319,8 @@ class ShipmentManager {
     document.getElementById('shipmentDate').valueAsDate = new Date();
     document.getElementById('totalProductCost').value = '';
     document.getElementById('totalSellPrice').value = '';
-    document.getElementById('productsContainer').innerHTML = `
-      <div class="product-item" id="product_0">
-        <h4>Продукт 1</h4>
-        <div class="form-row"><div class="form-group"><label>Описание:</label><input type="text" class="productName" data-index="0" placeholder="Описание" required></div><div class="form-group"><label>Размер:</label><select class="productSize" data-index="0" required><option value="">Избери</option><option value="XS">XS</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option></select></div></div>
-        <div class="form-row"><div class="form-group"><label>Валута:</label><select class="currency" data-index="0" required><option value="EUR">€ Евро</option><option value="USD">$ Долар</option></select></div><div class="form-group"><label>Цена:</label><input type="number" class="productCost" data-index="0" step="0.01" min="0" required></div><div class="form-group"><label>В евро:</label><input type="number" class="convertedCost" data-index="0" step="0.01" readonly></div></div>
-        <div class="form-row"><div class="form-group checkbox-group"><label><input type="checkbox" class="isSold" data-index="0" checked> Продаден?</label></div></div>
-        <div class="form-row sold-section" data-index="0"><div class="form-group"><label>Продажба (€):</label><input type="number" class="productSellPrice" data-index="0" step="0.01" min="0" required></div><div class="form-group"><label>Печалба:</label><input type="number" class="productProfit" data-index="0" readonly style="background:#f0f0f0;"></div></div>
-        <button type="button" class="btn-remove-product" data-index="0" style="display:none;">Премахни</button>
-      </div>`;
+    document.getElementById('totalExpenses').value = '';
+    document.getElementById('productsContainer').innerHTML = `<div class="product-item" id="product_0"><h4>Продукт 1</h4><div class="form-row"><div class="form-group"><label>Описание:</label><input type="text" class="productName" data-index="0" placeholder="Описание" required></div><div class="form-group"><label>Размер:</label><select class="productSize" data-index="0" required><option value="">Избери</option><option value="XS">XS</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option></select></div></div><div class="form-row"><div class="form-group"><label>Валута:</label><select class="currency" data-index="0" required><option value="EUR">€ Евро</option><option value="USD">$ Долар</option></select></div><div class="form-group"><label>Цена:</label><input type="number" class="productCost" data-index="0" step="0.01" min="0" required></div><div class="form-group"><label>В евро:</label><input type="number" class="convertedCost" data-index="0" step="0.01" readonly></div></div><div class="form-row"><div class="form-group checkbox-group"><label><input type="checkbox" class="isSold" data-index="0" checked> Продаден?</label></div></div><div class="form-row sold-section" data-index="0"><div class="form-group"><label>Продажба (€):</label><input type="number" class="productSellPrice" data-index="0" step="0.01" min="0" required></div><div class="form-group"><label>Печалба:</label><input type="number" class="productProfit" data-index="0" readonly style="background:#f0f0f0;"></div></div><button type="button" class="btn-remove-product" data-index="0" style="display:none;">Премахни</button></div>`;
     this.productIndex = 1;
     this.attachProductListeners();
   }
@@ -353,13 +338,7 @@ class ShipmentManager {
     container.innerHTML = this.shipments.map(s => {
       const sold = (s.products || []).filter(p => p.isSold);
       const unsold = (s.products || []).filter(p => !p.isSold);
-      return `<div class="shipment-card">
-        <h3>Пратка от ${new Date(s.date).toLocaleDateString('bg-BG')}</h3>
-        ${sold.length ? `<div class="products-list sold-products"><strong>✅ Продадени (${sold.length}):</strong>${sold.map(p => `<div class="product-row"><p>• ${p.name} (${p.size}) - ${(p.cost||0).toFixed(2)}€ → ${(p.sellPrice||0).toFixed(2)}€ <span class="${(p.profit||0)>=0?'profit-positive':'profit-negative'}">(${(p.profit||0).toFixed(2)}€)</span></p><button onclick="manager.deleteProduct(${s.id},${p.id})" class="btn-delete-small">✕</button></div>`).join('')}</div>` : ''}
-        ${unsold.length ? `<div class="products-list unsold-products-list"><strong>⏳ Несолд (${unsold.length}):</strong>${unsold.map(p => `<div class="unsold-product-row"><p>• ${p.name} (${p.size}) - ${(p.cost||0).toFixed(2)}€</p><div class="unsold-actions"><input type="number" id="sell_${s.id}_${p.id}" step="0.01" placeholder="Цена €"><button onclick="manager.markProductAsSold(${s.id},${p.id},parseFloat(document.getElementById('sell_${s.id}_${p.id}').value))" class="btn-mark-sold">Продай</button><button onclick="manager.deleteProduct(${s.id},${p.id})" class="btn-delete-small">✕</button></div></div>`).join('')}</div>` : ''}
-        <div class="shipment-summary"><p><strong>Продукти:</strong> ${(s.totalProductCost||0).toFixed(2)}€</p><p><strong>Транспорт:</strong> ${(s.transportCost||0).toFixed(2)}€</p><p><strong>Продажба:</strong> ${(s.totalSellPrice||0).toFixed(2)}€</p><p class="profit ${(s.profit||0)>=0?'positive':'negative'}"><strong>Печалба:</strong> ${(s.profit||0).toFixed(2)}€</p></div>
-        <button class="delete-btn" onclick="manager.deleteShipment(${s.id})">Изтрий пратка</button>
-      </div>`;
+      return `<div class="shipment-card"><h3>Пратка от ${new Date(s.date).toLocaleDateString('bg-BG')}</h3>${sold.length ? `<div class="products-list sold-products"><strong>✅ Продадени (${sold.length}):</strong>${sold.map(p => `<div class="product-row"><p>• ${p.name} (${p.size}) - ${(p.cost||0).toFixed(2)}€ → ${(p.sellPrice||0).toFixed(2)}€ <span class="${(p.profit||0)>=0?'profit-positive':'profit-negative'}">(${(p.profit||0).toFixed(2)}€)</span></p><button onclick="manager.deleteProduct(${s.id},${p.id})" class="btn-delete-small">✕</button></div>`).join('')}</div>` : ''}${unsold.length ? `<div class="products-list unsold-products-list"><strong>⏳ Несолд (${unsold.length}):</strong>${unsold.map(p => `<div class="unsold-product-row"><p>• ${p.name} (${p.size}) - ${(p.cost||0).toFixed(2)}€</p><div class="unsold-actions"><input type="number" id="sell_${s.id}_${p.id}" step="0.01" placeholder="Цена €"><button onclick="manager.markProductAsSold(${s.id},${p.id},parseFloat(document.getElementById('sell_${s.id}_${p.id}').value))" class="btn-mark-sold">Продай</button><button onclick="manager.deleteProduct(${s.id},${p.id})" class="btn-delete-small">✕</button></div></div>`).join('')}</div>` : ''}<div class="shipment-summary"><p><strong>Продукти:</strong> ${(s.totalProductCost||0).toFixed(2)}€</p><p><strong>Транспорт:</strong> ${(s.transport||0).toFixed(2)}€</p><p><strong>VAT:</strong> ${(s.vat||0).toFixed(2)}€</p><p><strong>Реклама:</strong> ${(s.ads||0).toFixed(2)}€</p><p><strong>Payment Fee:</strong> ${(s.processing||0).toFixed(2)}€</p><p><strong>Продажба:</strong> ${(s.totalSellPrice||0).toFixed(2)}€</p><p class="profit ${(s.profit||0)>=0?'positive':'negative'}"><strong>Печалба:</strong> ${(s.profit||0).toFixed(2)}€</p></div><div style="display:flex;gap:10px;margin-top:10px;"><button class="delete-btn" onclick="manager.deleteShipment(${s.id})">Изтрий</button><button class="btn-secondary" onclick="manager.editShipment(${s.id})">✏️ Редактирай</button></div></div>`;
     }).join('');
   }
 
